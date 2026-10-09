@@ -1,0 +1,14 @@
+# Quantum stack
+qiskit>=1.2.0
+qiskit-aer>=0.14.0
+qiskit-ibm-runtime>=0.25.0
+# Numerics
+numpy>=1.26.0
+scipy>=1.13.0
+pandas>=2.2.0
+matplotlib>=3.8.0
+# Backend API
+flask>=3.0.0
+flask-cors>=4.0.0
+# Notebook extras
+tabulate>=0.9.0
