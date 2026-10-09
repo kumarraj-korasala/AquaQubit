@@ -1,5 +1,11 @@
 /**
- * app.js — AquaQubit Client-Side Engine Controller
+ * app.js — AquaQubit Client-Side Engine & Chart.js Visualizer
+ * Color Palette:
+ *   --stormy-teal:    #006d77
+ *   --pearl-aqua:     #83c5be
+ *   --alice-blue:     #edf6f9
+ *   --almond-silk:    #ffddd2
+ *   --tangerine-dream: #e29578
  */
 
 const API_BASE = window.location.protocol.startsWith('http')
@@ -7,8 +13,9 @@ const API_BASE = window.location.protocol.startsWith('http')
     : 'http://localhost:5000/api';
 
 let currentScheduleData = null;
+let allocationChartInstance = null;
+let equityChartInstance = null;
 
-// Regional Storage Defaults
 const REGION_SUPPLY_DEFAULTS = {
     "krishna_godavari": 10.0,
     "kaveri_basin": 8.0,
@@ -16,7 +23,7 @@ const REGION_SUPPLY_DEFAULTS = {
     "custom": 9.0
 };
 
-// Initialize on load
+// Initialize on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
     checkHealth();
     fetchSchedule(5, 10.0, 2, 42, "krishna_godavari");
@@ -78,7 +85,7 @@ async function fetchSchedule(nCanals, supplyTmc, pDepth, seed, regionKey) {
             renderDashboard(json.data);
         }
     } catch (err) {
-        alert("Optimization request failed: " + err.message);
+        alert("Optimization failed: " + err.message);
     } finally {
         showLoading(false);
     }
@@ -97,7 +104,7 @@ function showLoading(show) {
 }
 
 function renderDashboard(data) {
-    // 1. Summary KPI Cards
+    // 1. KPI Cards
     document.getElementById("kpiSupply").textContent = `${data.available_supply_tmc.toFixed(1)} TMC`;
     document.getElementById("kpiRegionName").textContent = data.region_name;
 
@@ -113,14 +120,15 @@ function renderDashboard(data) {
     // 2. Schedule Table
     renderScheduleTable(data.schedule);
 
-    // 3. Flow Distribution Cards
-    renderNetworkFlowGrid(data.schedule);
+    // 3. Render Visual Charts
+    renderAllocationChart(data.schedule);
+    renderGateChart(data.schedule);
 
-    // 4. Optimization Metadata
+    // 4. Optimization Meta
     if (data.optimization_meta) {
         const meta = data.optimization_meta;
         document.getElementById("solverInfoText").textContent = 
-            `Engine: ${meta.engine} | Qubits: ${meta.n_qubits} | Depth: p=${meta.circuit_depth_p} | Execution Time: ${meta.runtime_seconds}s | Ising Energy: ${meta.ising_energy}`;
+            `Engine: ${meta.engine} | Qubits: ${meta.n_qubits} | Depth: p=${meta.circuit_depth_p} | Runtime: ${meta.runtime_seconds}s | Ising Energy: ${meta.ising_energy}`;
     }
 }
 
@@ -130,7 +138,6 @@ function renderScheduleTable(schedule) {
 
     schedule.forEach(row => {
         const tr = document.createElement("tr");
-
         const statusBadge = row.min_flow_met 
             ? `<span class="badge-tag badge-success">Passed (${row.min_flow_req_tmc} TMC)</span>`
             : `<span class="badge-tag badge-danger">Violated</span>`;
@@ -150,23 +157,89 @@ function renderScheduleTable(schedule) {
     });
 }
 
-function renderNetworkFlowGrid(schedule) {
-    const grid = document.getElementById("networkFlowGrid");
-    grid.innerHTML = "";
+/**
+ * Chart 1: Allocated Volume vs Required Min Flow
+ */
+function renderAllocationChart(schedule) {
+    const ctx = document.getElementById("allocationChart").getContext("2d");
+    if (allocationChartInstance) allocationChartInstance.destroy();
 
-    schedule.forEach(row => {
-        const card = document.createElement("div");
-        card.className = "flow-card";
+    const labels = schedule.map(s => `Zone ${s.canal_id}`);
+    const allocated = schedule.map(s => s.allocated_tmc);
+    const required = schedule.map(s => s.min_flow_req_tmc);
 
-        card.innerHTML = `
-            <div class="flow-title">${row.canal_name.split("(")[0]}</div>
-            <div class="flow-units">${row.allocated_tmc} TMC</div>
-            <div class="flow-meta">
-                <span>Flow: ${row.flow_cusecs.toLocaleString()} cusecs</span>
-                <span>Gate: ${row.gate_opening_pct}% Open</span>
-            </div>
-        `;
-        grid.appendChild(card);
+    allocationChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Allocated Volume (TMC)",
+                    data: allocated,
+                    backgroundColor: "#006d77",
+                    borderRadius: 4
+                },
+                {
+                    label: "Required Floor (TMC)",
+                    data: required,
+                    backgroundColor: "#e29578",
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: "#003840", font: { family: "Inter", weight: "600" } } }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: "#edf6f9" }, ticks: { color: "#2d4a52" } },
+                x: { grid: { display: false }, ticks: { color: "#2d4a52" } }
+            }
+        }
+    });
+}
+
+/**
+ * Chart 2: Gate Opening % per Canal Zone
+ */
+function renderGateChart(schedule) {
+    const ctx = document.getElementById("equityChart").getContext("2d");
+    if (equityChartInstance) equityChartInstance.destroy();
+
+    const labels = schedule.map(s => `Zone ${s.canal_id}`);
+    const openings = schedule.map(s => s.gate_opening_pct);
+
+    equityChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Gate Opening (% Capacity)",
+                    data: openings,
+                    borderColor: "#006d77",
+                    backgroundColor: "rgba(131, 197, 190, 0.3)",
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 6,
+                    pointBackgroundColor: "#e29578"
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: "#003840", font: { family: "Inter", weight: "600" } } }
+            },
+            scales: {
+                y: { min: 0, max: 100, grid: { color: "#edf6f9" }, ticks: { color: "#2d4a52" } },
+                x: { grid: { display: false }, ticks: { color: "#2d4a52" } }
+            }
+        }
     });
 }
 

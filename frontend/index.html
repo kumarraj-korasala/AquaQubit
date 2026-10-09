@@ -7,26 +7,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js for Interactive Basin Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- ── APPLICATION HEADER ─────────────────────────────────────── -->
+        <!-- ── APPLICATION NAVBAR ─────────────────────────────────────── -->
         <header class="navbar">
             <div class="brand">
                 <div class="brand-logo">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
+                        <circle cx="12" cy="12" r="2.5"></circle>
                     </svg>
                 </div>
                 <div class="brand-text">
                     <h1>AquaQubit</h1>
-                    <p class="subtitle">Quantum-Powered Water Release &amp; Distribution Engine</p>
+                    <p class="subtitle">Quantum Water Release &amp; Allocation Platform</p>
                 </div>
             </div>
             <div class="header-status">
-                <div class="badge badge-system">Scalable Basin Solver</div>
+                <div class="badge badge-system">Basin Solver</div>
                 <div class="badge badge-qaoa">QAOA Engine</div>
                 <div class="status-indicator connected" id="apiStatus">
                     <span class="dot"></span>
@@ -53,19 +55,19 @@
                             <option value="narmada_command">Narmada Main Command Area</option>
                             <option value="custom">Custom Command Region</option>
                         </select>
-                        <div class="help-text">Select a pre-loaded basin profile or configure a custom region.</div>
+                        <div class="help-text">Select a river basin profile or configure custom parameters.</div>
                     </div>
 
-                    <!-- Available Reservoir Storage -->
+                    <!-- Available Storage -->
                     <div class="form-group">
                         <label for="supplyInput">Available Inflow Storage (TMC)</label>
                         <input type="number" id="supplyInput" class="form-input" value="10.0" step="0.5" min="1.0" max="50.0">
-                        <div class="help-text">Total available water volume for allocation (TMC = Thousand Million Cu. Ft.).</div>
+                        <div class="help-text">Available water volume (1 TMC = 1 Thousand Million Cu. Ft.).</div>
                     </div>
 
-                    <!-- Number of Canals / Sub-Distributaries -->
+                    <!-- Canal Zones -->
                     <div class="form-group">
-                        <label for="nCanalsSelect">Canal Networks / Zones ($3N$ Qubits)</label>
+                        <label for="nCanalsSelect">Canal Zones ($3N$ Qubits)</label>
                         <select id="nCanalsSelect" class="form-select">
                             <option value="5" selected>5 Canal Zones (15 Qubits)</option>
                             <option value="4">4 Canal Zones (12 Qubits)</option>
@@ -73,11 +75,11 @@
                         </select>
                     </div>
 
-                    <!-- QAOA Circuit Depth -->
+                    <!-- QAOA Depth -->
                     <div class="form-group">
-                        <label for="pDepthSelect">QAOA Circuit Optimization Depth ($p$)</label>
+                        <label for="pDepthSelect">QAOA Circuit Depth ($p$)</label>
                         <select id="pDepthSelect" class="form-select">
-                            <option value="2" selected>Depth p=2 (Recommended)</option>
+                            <option value="2" selected>Depth p=2 (Standard Operational)</option>
                             <option value="1">Depth p=1 (Fast Evaluation)</option>
                             <option value="3">Depth p=3 (Deep Optimization)</option>
                         </select>
@@ -85,23 +87,21 @@
 
                     <!-- Seed -->
                     <div class="form-group">
-                        <label for="seedInput">Random Generation Seed</label>
+                        <label for="seedInput">Hydro-Instance Seed</label>
                         <input type="number" id="seedInput" class="form-input" value="42" min="1" max="9999">
                     </div>
 
-                    <!-- Submit Button -->
                     <button type="submit" id="scheduleBtn" class="btn btn-primary btn-block">
                         <span>Run AquaQubit Engine</span>
                     </button>
                 </form>
 
-                <!-- Input Summary Card -->
                 <div class="info-card">
-                    <h3>Input Definitions</h3>
+                    <h3>Input Summary</h3>
                     <ul class="input-summary-list">
                         <li><strong>Inflow Storage:</strong> Volume available at headworks.</li>
                         <li><strong>Release Levels:</strong> Low (33%), Med (66%), High (100%).</li>
-                        <li><strong>QUBO Constraints:</strong> Supply floor, municipal priority &amp; tail-end equity.</li>
+                        <li><strong>QUBO Constraints:</strong> Supply, municipal floor &amp; equity.</li>
                     </ul>
                 </div>
             </aside>
@@ -112,32 +112,55 @@
                 <div class="kpi-grid">
                     <div class="kpi-card">
                         <div class="kpi-label">Available Storage</div>
-                        <div class="kpi-value highlight-blue" id="kpiSupply">10.0 TMC</div>
+                        <div class="kpi-value highlight-teal" id="kpiSupply">10.0 TMC</div>
                         <div class="kpi-subtext" id="kpiRegionName">Krishna-Godavari Command Area</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Allocated Water</div>
-                        <div class="kpi-value highlight-green" id="kpiAllocated">10.0 TMC</div>
+                        <div class="kpi-value highlight-teal" id="kpiAllocated">10.0 TMC</div>
                         <div class="kpi-subtext" id="kpiEfficiency">100.0% Water Efficiency</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Jain's Equity Index</div>
-                        <div class="kpi-value highlight-indigo" id="kpiEquity">0.96</div>
+                        <div class="kpi-value highlight-tangerine" id="kpiEquity">0.96</div>
                         <div class="kpi-subtext" id="kpiEquitySub">Equitable Distribution</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">System Utility Score</div>
-                        <div class="kpi-value highlight-blue" id="kpiUtility">32.4</div>
+                        <div class="kpi-value highlight-teal" id="kpiUtility">32.4</div>
                         <div class="kpi-subtext" id="kpiViolations">0 Floor Violations</div>
                     </div>
                 </div>
 
-                <!-- Loading Spinner -->
+                <!-- Loading Banner -->
                 <div id="loadingBanner" class="loading-banner hidden">
                     <div class="spinner"></div>
                     <div class="loading-text">
                         <h4>Evaluating Quantum QAOA Optimization Engine...</h4>
-                        <p>Constructing multi-canal QUBO Hamiltonian &amp; computing exact statevector parameters</p>
+                        <p>Constructing multi-canal QUBO Hamiltonian &amp; computing statevector parameters</p>
+                    </div>
+                </div>
+
+                <!-- ── VISUAL CHARTS SECTION ──────────────────────────────── -->
+                <div class="viz-grid">
+                    <!-- Chart 1: Water Allocation per Canal Zone -->
+                    <div class="panel viz-card">
+                        <div class="panel-header">
+                            <h3>Water Volume Allocated vs Required Floor</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="allocationChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Equity & Performance Metrics -->
+                    <div class="panel viz-card">
+                        <div class="panel-header">
+                            <h3>Zone Gate Opening % &amp; Capacity Utilization</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="equityChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -155,7 +178,7 @@
                                     <th>Canal Reach Name</th>
                                     <th>Position</th>
                                     <th>Target Assignment</th>
-                                    <th>Assigned Release Level</th>
+                                    <th>Release Level</th>
                                     <th>Volume (TMC)</th>
                                     <th>Flow Rate (Cusecs)</th>
                                     <th>Gate Opening</th>
@@ -164,45 +187,19 @@
                             </thead>
                             <tbody id="scheduleTbody">
                                 <tr>
-                                    <td colspan="9" class="text-center placeholder-text">Click "Run AquaQubit Engine" to compute water release schedule.</td>
+                                    <td colspan="9" class="text-center placeholder-text">Click "Run AquaQubit Engine" to compute schedule.</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- ── FLOW NETWORK & PERFORMANCE INSIGHTS ────────────────── -->
-                <div class="viz-grid">
-                    <!-- Flow Distribution Cards -->
-                    <div class="panel viz-card">
-                        <div class="panel-header">
-                            <h3>Canal Release Distribution</h3>
-                        </div>
-                        <div id="networkFlowGrid" class="network-flow-grid">
-                            <div class="placeholder-text text-center">Run engine to view flow distribution across canal reaches.</div>
-                        </div>
+                <!-- ── PERFORMANCE METRICS ───────────────────────────────── -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Solver Optimization Summary</h3>
                     </div>
-
-                    <!-- System Performance Summary -->
-                    <div class="panel viz-card">
-                        <div class="panel-header">
-                            <h3>Engine Performance &amp; Constraint Compliance</h3>
-                        </div>
-                        <div class="policy-details">
-                            <div class="policy-item">
-                                <h4>Municipal &amp; Critical Intake Security</h4>
-                                <p>Drinking water intakes and essential urban demands receive non-negotiable floor priority.</p>
-                            </div>
-                            <div class="policy-item">
-                                <h4>Tail-End Farmer Protection</h4>
-                                <p>Quadratic pairwise penalties minimize distribution variance between head-end and tail-end zones.</p>
-                            </div>
-                            <div class="policy-item">
-                                <h4>Solver Metrics</h4>
-                                <p id="solverInfoText">Engine: AquaQubit QAOA | Qubits: 15 | Depth: p=2 | Runtime: 0.24s</p>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="solver-info-text" id="solverInfoText">Engine: AquaQubit QAOA | Qubits: 15 | Depth: p=2 | Execution Time: 0.24s</p>
                 </div>
             </section>
         </main>
