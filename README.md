@@ -11,7 +11,6 @@
 ## 🏆 Qiskit Fall Fest 2026 Submission Summary
 
 - **Team Name:** `ApexGP`
-- **GitHub Repository:** [https://github.com/kumarraj-korasala/AquaQubit.git](https://github.com/kumarraj-korasala/AquaQubit.git)
 
 ### 1. Novelty (48 words)
 AquaQubit introduces a novel multi-objective 5-term QUBO model for river basin water allocation. It simultaneously optimizes reservoir storage limits, municipal drinking water floor priorities, and pairwise quadratic tail-end equity penalties. This prevents downstream farmer starvation and resolves multi-stakeholder conflicts across variable seasonal inflow scenarios.
@@ -85,12 +84,8 @@ $$\min_{x} E(x) = x^T Q x = \text{Term}_1 + \text{Term}_2 + \text{Term}_3 + \tex
 
 ## 🚀 Quick Start & Installation
 
-### 1. Clone & Setup Environment
+### 1. Setup Environment
 ```bash
-# Clone the repository
-git clone https://github.com/kumarraj-korasala/AquaQubit.git
-cd AquaQubit
-
 # Create a virtual environment
 python -m venv .venv
 
