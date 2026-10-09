@@ -3,209 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AP Water Resources Dept — Krishna-Godavari Water Release Scheduler</title>
+    <title>AquaQubit — Quantum Water Allocation Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- ── CWC / AP WATER RESOURCES DEPT HEADER ─────────────────────── -->
+        <!-- ── APPLICATION HEADER ─────────────────────────────────────── -->
         <header class="navbar">
             <div class="brand">
-                <div class="brand-icon">🌊</div>
+                <div class="brand-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </div>
                 <div class="brand-text">
-                    <h1>Andhra Pradesh Water Resources Department</h1>
-                    <p class="subtitle">Krishna-Godavari Command Area — Quantum Decision Support System (CWC / KGBO)</p>
+                    <h1>AquaQubit</h1>
+                    <p class="subtitle">Quantum-Powered Water Release &amp; Distribution Engine</p>
                 </div>
             </div>
             <div class="header-status">
-                <div class="badge badge-cwc">CWC / KGBO Joint Cell</div>
-                <div class="badge badge-qiskit">QAOA Quantum Engine</div>
+                <div class="badge badge-system">Scalable Basin Solver</div>
+                <div class="badge badge-qaoa">QAOA Engine</div>
                 <div class="status-indicator connected" id="apiStatus">
                     <span class="dot"></span>
-                    <span class="status-text">Engine Online</span>
+                    <span class="status-text">Engine Ready</span>
                 </div>
             </div>
         </header>
 
-        <!-- ── MAIN DASHBOARD LAYOUT ───────────────────────────────────── -->
+        <!-- ── MAIN DASHBOARD ─────────────────────────────────────────── -->
         <main class="main-layout">
             <!-- ── CONTROL PANEL SIDEBAR ───────────────────────────────── -->
             <aside class="sidebar">
                 <div class="panel-header">
-                    <h2><span class="icon">🎛️</span> Basin Operations Control</h2>
+                    <h2>Configuration Parameters</h2>
                 </div>
 
                 <form id="scheduleForm" onsubmit="handleScheduleSubmit(event)">
-                    <!-- Hydrological Inflow Scenario -->
+                    <!-- Command Region Profile -->
                     <div class="form-group">
-                        <label>Seasonal Basin Inflow Scenario</label>
-                        <div class="scenario-grid">
-                            <label class="scenario-card">
-                                <input type="radio" name="scenario" value="Deficit">
-                                <div class="card-content">
-                                    <span class="scen-title">Deficit</span>
-                                    <span class="scen-desc">Drought (50%)</span>
-                                </div>
-                            </label>
-                            <label class="scenario-card">
-                                <input type="radio" name="scenario" value="Normal" checked>
-                                <div class="card-content">
-                                    <span class="scen-title">Normal</span>
-                                    <span class="scen-desc">Kharif (100%)</span>
-                                </div>
-                            </label>
-                            <label class="scenario-card">
-                                <input type="radio" name="scenario" value="Surplus">
-                                <div class="card-content">
-                                    <span class="scen-title">Surplus</span>
-                                    <span class="scen-desc">Flood (150%)</span>
-                                </div>
-                            </label>
-                        </div>
+                        <label for="regionSelect">Target Command Region / Basin</label>
+                        <select id="regionSelect" class="form-select" onchange="onRegionChange()">
+                            <option value="krishna_godavari" selected>Krishna-Godavari Command Area</option>
+                            <option value="kaveri_basin">Kaveri River Command Basin</option>
+                            <option value="narmada_command">Narmada Main Command Area</option>
+                            <option value="custom">Custom Command Region</option>
+                        </select>
+                        <div class="help-text">Select a pre-loaded basin profile or configure a custom region.</div>
                     </div>
 
-                    <!-- Command Area Reach Selection -->
+                    <!-- Available Reservoir Storage -->
                     <div class="form-group">
-                        <label for="nCanalsSelect">Command Area Reach &amp; Zones</label>
+                        <label for="supplyInput">Available Inflow Storage (TMC)</label>
+                        <input type="number" id="supplyInput" class="form-input" value="10.0" step="0.5" min="1.0" max="50.0">
+                        <div class="help-text">Total available water volume for allocation (TMC = Thousand Million Cu. Ft.).</div>
+                    </div>
+
+                    <!-- Number of Canals / Sub-Distributaries -->
+                    <div class="form-group">
+                        <label for="nCanalsSelect">Canal Networks / Zones ($3N$ Qubits)</label>
                         <select id="nCanalsSelect" class="form-select">
-                            <option value="5" selected>5 Canal Zones (15 Qubits — Full Basin)</option>
-                            <option value="4">4 Canal Zones (12 Qubits — Main Reaches)</option>
-                            <option value="3">3 Canal Zones (9 Qubits — Major Distributaries)</option>
+                            <option value="5" selected>5 Canal Zones (15 Qubits)</option>
+                            <option value="4">4 Canal Zones (12 Qubits)</option>
+                            <option value="3">3 Canal Zones (9 Qubits)</option>
                         </select>
                     </div>
 
-                    <!-- Quantum Optimization Engine Depth -->
+                    <!-- QAOA Circuit Depth -->
                     <div class="form-group">
-                        <label for="pDepthSelect">Quantum Engine Circuit Depth (p)</label>
+                        <label for="pDepthSelect">QAOA Circuit Optimization Depth ($p$)</label>
                         <select id="pDepthSelect" class="form-select">
-                            <option value="2" selected>QAOA p=2 (Standard Operational)</option>
-                            <option value="1">QAOA p=1 (Fast Scheduling)</option>
-                            <option value="3">QAOA p=3 (Maximum Precision)</option>
+                            <option value="2" selected>Depth p=2 (Recommended)</option>
+                            <option value="1">Depth p=1 (Fast Evaluation)</option>
+                            <option value="3">Depth p=3 (Deep Optimization)</option>
                         </select>
-                        <div class="help-text">Solves multi-canal QUBO under physical hydrological constraints.</div>
                     </div>
 
-                    <!-- Seed Input -->
+                    <!-- Seed -->
                     <div class="form-group">
-                        <label for="seedInput">Hydro-Instance Seed</label>
+                        <label for="seedInput">Random Generation Seed</label>
                         <input type="number" id="seedInput" class="form-input" value="42" min="1" max="9999">
                     </div>
 
-                    <!-- Action Button -->
+                    <!-- Submit Button -->
                     <button type="submit" id="scheduleBtn" class="btn btn-primary btn-block">
-                        <span class="btn-icon">⚡</span> Generate Water Release Order
+                        <span>Run AquaQubit Engine</span>
                     </button>
                 </form>
 
-                <!-- KG Basin Reservoirs Quick Info Card -->
+                <!-- Input Summary Card -->
                 <div class="info-card">
-                    <h3><span class="icon">🏞️</span> KG Command Reservoirs</h3>
-                    <ul class="penalty-list">
-                        <li><strong>Srisailam:</strong> 215.8 TMC</li>
-                        <li><strong>Nagarjuna Sagar:</strong> 312.0 TMC</li>
-                        <li><strong>Prakasam Barrage:</strong> 3.0 TMC</li>
+                    <h3>Input Definitions</h3>
+                    <ul class="input-summary-list">
+                        <li><strong>Inflow Storage:</strong> Volume available at headworks.</li>
+                        <li><strong>Release Levels:</strong> Low (33%), Med (66%), High (100%).</li>
+                        <li><strong>QUBO Constraints:</strong> Supply floor, municipal priority &amp; tail-end equity.</li>
                     </ul>
-                    <p class="card-note">Monitored jointly by CWC, KGBO &amp; AP Water Resources Dept.</p>
                 </div>
             </aside>
 
-            <!-- ── OPERATIONAL WORKSPACE ───────────────────────────────── -->
+            <!-- ── DASHBOARD WORKSPACE ─────────────────────────────────── -->
             <section class="dashboard">
                 <!-- Summary KPI Cards -->
                 <div class="kpi-grid">
                     <div class="kpi-card">
-                        <div class="kpi-label">Available Inflow</div>
-                        <div class="kpi-value highlight-cyan" id="kpiSupply">10 TMC</div>
-                        <div class="kpi-subtext" id="kpiScenarioLabel">Normal Kharif Season</div>
+                        <div class="kpi-label">Available Storage</div>
+                        <div class="kpi-value highlight-blue" id="kpiSupply">10.0 TMC</div>
+                        <div class="kpi-subtext" id="kpiRegionName">Krishna-Godavari Command Area</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label">Water Allocated</div>
-                        <div class="kpi-value highlight-green" id="kpiAllocated">10 TMC</div>
-                        <div class="kpi-subtext" id="kpiEfficiency">100% Efficiency (0 Waste)</div>
+                        <div class="kpi-label">Allocated Water</div>
+                        <div class="kpi-value highlight-green" id="kpiAllocated">10.0 TMC</div>
+                        <div class="kpi-subtext" id="kpiEfficiency">100.0% Water Efficiency</div>
                     </div>
                     <div class="kpi-card">
                         <div class="kpi-label">Jain's Equity Index</div>
-                        <div class="kpi-value highlight-purple" id="kpiEquity">0.96</div>
-                        <div class="kpi-subtext" id="kpiEquitySub">Target: &gt;0.85 (Equitable)</div>
+                        <div class="kpi-value highlight-indigo" id="kpiEquity">0.96</div>
+                        <div class="kpi-subtext" id="kpiEquitySub">Equitable Distribution</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-label">Conflict Risk Status</div>
-                        <div class="kpi-value highlight-cyan" id="kpiConflict">LOW</div>
-                        <div class="kpi-subtext" id="kpiViolations">0 Min-Flow Violations</div>
+                        <div class="kpi-label">System Utility Score</div>
+                        <div class="kpi-value highlight-blue" id="kpiUtility">32.4</div>
+                        <div class="kpi-subtext" id="kpiViolations">0 Floor Violations</div>
                     </div>
                 </div>
 
-                <!-- Execution Loading Overlay -->
+                <!-- Loading Spinner -->
                 <div id="loadingBanner" class="loading-banner hidden">
                     <div class="spinner"></div>
                     <div class="loading-text">
-                        <h4>Running Quantum QAOA Optimization Engine...</h4>
-                        <p>Constructing QUBO Hamiltonian &amp; scheduling water releases across command area canals</p>
+                        <h4>Evaluating Quantum QAOA Optimization Engine...</h4>
+                        <p>Constructing multi-canal QUBO Hamiltonian &amp; computing exact statevector parameters</p>
                     </div>
                 </div>
 
-                <!-- ── OFFICIAL WATER RELEASE ORDER TABLE ───────────────── -->
+                <!-- ── OPERATIONAL RELEASE SCHEDULE TABLE ─────────────────── -->
                 <div class="panel">
                     <div class="panel-header flex-between">
-                        <h3><span class="icon">📋</span> Official CWC / KGBO Water Release Order</h3>
-                        <button class="btn btn-secondary btn-sm" onclick="exportScheduleCSV()">📄 Export Release Order (CSV)</button>
+                        <h3>Operational Water Release Schedule</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="exportScheduleCSV()">Export Schedule (CSV)</button>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Canal / Network Reach</th>
-                                    <th>Zone</th>
-                                    <th>Stakeholder / Target Use</th>
-                                    <th>Release Level</th>
+                                    <th>Zone ID</th>
+                                    <th>Canal Reach Name</th>
+                                    <th>Position</th>
+                                    <th>Target Assignment</th>
+                                    <th>Assigned Release Level</th>
                                     <th>Volume (TMC)</th>
                                     <th>Flow Rate (Cusecs)</th>
                                     <th>Gate Opening</th>
-                                    <th>Min Flow Floor</th>
-                                    <th>Utility Score</th>
+                                    <th>Min Flow Status</th>
                                 </tr>
                             </thead>
                             <tbody id="scheduleTbody">
                                 <tr>
-                                    <td colspan="9" class="text-center placeholder-text">Click "Generate Water Release Order" to produce the optimal schedule.</td>
+                                    <td colspan="9" class="text-center placeholder-text">Click "Run AquaQubit Engine" to compute water release schedule.</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- ── NETWORK FLOW VISUALIZATION & MANDATE INSIGHTS ─────── -->
+                <!-- ── FLOW NETWORK & PERFORMANCE INSIGHTS ────────────────── -->
                 <div class="viz-grid">
-                    <!-- Canal Network Flow Diagram -->
+                    <!-- Flow Distribution Cards -->
                     <div class="panel viz-card">
                         <div class="panel-header">
-                            <h3><span class="icon">🌐</span> Krishna-Godavari Canal Network Flow Map</h3>
+                            <h3>Canal Release Distribution</h3>
                         </div>
                         <div id="networkFlowGrid" class="network-flow-grid">
-                            <div class="placeholder-text text-center">Generate schedule to view flow distribution across canal reaches.</div>
+                            <div class="placeholder-text text-center">Run engine to view flow distribution across canal reaches.</div>
                         </div>
                     </div>
 
-                    <!-- Policy & Conflict Reduction Report -->
+                    <!-- System Performance Summary -->
                     <div class="panel viz-card">
                         <div class="panel-header">
-                            <h3><span class="icon">⚖️</span> CWC Hydrological Mandate &amp; Conflict Prevention</h3>
+                            <h3>Engine Performance &amp; Constraint Compliance</h3>
                         </div>
                         <div class="policy-details">
                             <div class="policy-item">
-                                <h4>🏙️ Municipal Drinking Water Priority</h4>
-                                <p>Guntur and Vijayawada municipal intakes receive non-negotiable minimum floor releases enforced via QUBO D-term penalty ($D = 50.0$).</p>
+                                <h4>Municipal &amp; Critical Intake Security</h4>
+                                <p>Drinking water intakes and essential urban demands receive non-negotiable floor priority.</p>
                             </div>
                             <div class="policy-item">
-                                <h4>🌾 Tail-End Drought Prevention</h4>
-                                <p>Head-end vs tail-end release gaps are penalized quadratically ($\lambda = 2.0$), ensuring zero tail-end farmer starvation.</p>
+                                <h4>Tail-End Farmer Protection</h4>
+                                <p>Quadratic pairwise penalties minimize distribution variance between head-end and tail-end zones.</p>
                             </div>
                             <div class="policy-item">
-                                <h4>⚡ Quantum Optimization Solver Info</h4>
-                                <p id="solverInfoText">Engine: Quantum QAOA | Qubits: 15 | Depth: p=2 | Runtime: 0.24s</p>
+                                <h4>Solver Metrics</h4>
+                                <p id="solverInfoText">Engine: AquaQubit QAOA | Qubits: 15 | Depth: p=2 | Runtime: 0.24s</p>
                             </div>
                         </div>
                     </div>
@@ -215,7 +209,7 @@
 
         <!-- ── FOOTER ─────────────────────────────────────────────────── -->
         <footer class="footer">
-            <p>Krishna-Godavari Command Area Water Release Decision Support System | Built for <strong>Qiskit Fall Fest 2026</strong> — Use Case 03</p>
+            <p><strong>AquaQubit</strong> — Quantum-Powered Water Allocation &amp; Distribution Platform</p>
         </footer>
     </div>
 

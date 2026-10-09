@@ -157,12 +157,13 @@ def demo():
 @app.route("/api/schedule", methods=["GET", "POST"])
 def schedule():
     """
-    Generate official CWC / KGBO Water Release Order using Quantum QAOA Engine.
+    Generate AquaQubit Water Allocation Schedule using QAOA Engine.
     Body JSON / Query Params:
       n_canals: int (3, 4, 5)
-      scenario: str ("Deficit", "Normal", "Surplus")
+      supply_tmc: float (e.g. 10.0)
       p_depth: int (1, 2, 3)
       seed: int
+      region_key: str ("krishna_godavari", "kaveri_basin", "narmada_command", "custom")
     """
     try:
         from solvers import solve_water_release_schedule
@@ -170,12 +171,13 @@ def schedule():
             body = request.get_json(force=True, silent=True) or {}
         else:
             body = request.args
-        n_canals = int(body.get("n_canals", 5))
-        scenario = str(body.get("scenario", "Normal"))
-        p_depth  = int(body.get("p_depth", 2))
-        seed     = int(body.get("seed", 42))
+        n_canals   = int(body.get("n_canals", 5))
+        supply_tmc = float(body.get("supply_tmc", body.get("supply", 10.0)))
+        p_depth    = int(body.get("p_depth", 2))
+        seed       = int(body.get("seed", 42))
+        region_key = str(body.get("region_key", "krishna_godavari"))
 
-        order = solve_water_release_schedule(N=n_canals, scenario_name=scenario, p_depth=p_depth, seed=seed)
+        order = solve_water_release_schedule(N=n_canals, supply_tmc=supply_tmc, p_depth=p_depth, seed=seed, region_key=region_key)
         return jsonify({
             "success": True,
             "data": order,
@@ -187,19 +189,18 @@ def schedule():
 # ── GET /api/reservoirs ───────────────────────────────────────────────────────
 @app.route("/api/reservoirs", methods=["GET", "POST"])
 def reservoirs():
-    """Return status of Krishna-Godavari Basin reservoirs."""
-    from data import RESERVOIRS, INFLOW_SCENARIOS
+    """Return status of regional command area profiles."""
+    from data import BASIN_PROFILES
     return jsonify({
-        "basin": "Krishna-Godavari Command Area",
-        "reservoirs": RESERVOIRS,
-        "scenarios": INFLOW_SCENARIOS,
+        "system": "AquaQubit Engine",
+        "profiles": BASIN_PROFILES,
     })
 
 
 if __name__ == "__main__":
-    print("Starting Krishna-Godavari Water Release Decision Support System on http://localhost:5000")
+    print("Starting AquaQubit Water Allocation Engine on http://localhost:5000")
     print("Endpoints:")
-    print("  GET  / (CWC Command Center UI)")
+    print("  GET  / (AquaQubit Command Center UI)")
     print("  GET  /api/health")
     print("  GET  /api/reservoirs")
     print("  POST /api/schedule")

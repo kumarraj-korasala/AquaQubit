@@ -263,35 +263,33 @@ def run_all_solvers(N, benefit, supply, crops, p_list=None, seed=SEED_BASE,
     return out
 
 
-# ── Operational Entry Point for CWC/KGBO Decision Support System ──────────────
-def solve_water_release_schedule(N=5, scenario_name="Normal", p_depth=2, seed=SEED_BASE):
+# ── Operational Entry Point for AquaQubit Water Allocation Engine ─────────────
+def solve_water_release_schedule(N=5, supply_tmc=10.0, p_depth=2, seed=SEED_BASE, region_key="krishna_godavari"):
     """
-    Main Quantum Decision Support function for CWC / KGBO Water Resources Dept.
-    Solves the QUBO model using QAOA engine and returns official Water Release Order.
+    Main Quantum Decision Support function for AquaQubit.
+    Solves the multi-canal QUBO model using QAOA and returns operational release schedule.
     """
-    from data import INFLOW_SCENARIOS, get_canal_benefit_matrix, format_operational_schedule
+    from data import get_canal_benefit_matrix, generate_release_schedule
 
-    scen_info = INFLOW_SCENARIOS.get(scenario_name, INFLOW_SCENARIOS["Normal"])
-    supply = scen_info["available_supply_units"]
     benefit_matrix = get_canal_benefit_matrix(N, seed=seed)
 
-    Q = build_qubo(N, benefit_matrix, supply)
+    Q = build_qubo(N, benefit_matrix, supply_tmc)
     h, J = qubo_to_ising(Q)
     cost_op = ising_to_sparse_pauli(h, J, N * 3)
 
-    # Solve using Quantum QAOA engine
-    qr = run_qaoa(cost_op, Q, N, supply, p=p_depth, seed=seed)
+    # Solve using QAOA quantum optimisation engine
+    qr = run_qaoa(cost_op, Q, N, supply_tmc, p=p_depth, seed=seed)
 
-    # Format into official Water Release Order schedule
-    operational_order = format_operational_schedule(
-        qr["best_x"], N, benefit_matrix, supply, scen_info["label"]
+    # Format operational schedule
+    operational_order = generate_release_schedule(
+        qr["best_x"], N, benefit_matrix, supply_tmc, region_key=region_key
     )
-    operational_order["solver_info"] = {
-        "engine": "Quantum QAOA Engine",
+    operational_order["optimization_meta"] = {
+        "engine": "AquaQubit QAOA Engine",
         "circuit_depth_p": p_depth,
         "n_qubits": N * 3,
         "runtime_seconds": round(qr["runtime"], 3),
-        "energy_score": round(float(qr["best_e"]), 4),
+        "ising_energy": round(float(qr["best_e"]), 4),
     }
 
     return operational_order

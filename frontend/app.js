@@ -1,5 +1,5 @@
 /**
- * app.js — Client-Side Logic for CWC / KGBO Command Area Water Release Decision Support System
+ * app.js — AquaQubit Client-Side Engine Controller
  */
 
 const API_BASE = window.location.protocol.startsWith('http')
@@ -8,25 +8,35 @@ const API_BASE = window.location.protocol.startsWith('http')
 
 let currentScheduleData = null;
 
-// Initialize on DOM ready
+// Regional Storage Defaults
+const REGION_SUPPLY_DEFAULTS = {
+    "krishna_godavari": 10.0,
+    "kaveri_basin": 8.0,
+    "narmada_command": 12.0,
+    "custom": 9.0
+};
+
+// Initialize on load
 document.addEventListener("DOMContentLoaded", () => {
     checkHealth();
-    // Auto-load default schedule on startup
-    fetchSchedule(5, "Normal", 2, 42);
+    fetchSchedule(5, 10.0, 2, 42, "krishna_godavari");
 });
 
-/**
- * Check backend connectivity
- */
+function onRegionChange() {
+    const key = document.getElementById("regionSelect").value;
+    const supplyInput = document.getElementById("supplyInput");
+    if (REGION_SUPPLY_DEFAULTS[key]) {
+        supplyInput.value = REGION_SUPPLY_DEFAULTS[key].toFixed(1);
+    }
+}
+
 async function checkHealth() {
     const statusEl = document.getElementById("apiStatus");
     try {
         const res = await fetch(`${API_BASE}/health`);
         if (res.ok) {
             statusEl.classList.add("connected");
-            statusEl.querySelector(".status-text").textContent = "Engine Online";
-        } else {
-            throw new Error("HTTP " + res.status);
+            statusEl.querySelector(".status-text").textContent = "Engine Ready";
         }
     } catch (err) {
         statusEl.classList.remove("connected");
@@ -34,23 +44,18 @@ async function checkHealth() {
     }
 }
 
-/**
- * Form Submit Handler — POST /api/schedule
- */
 function handleScheduleSubmit(e) {
     e.preventDefault();
-    const nCanals = parseInt(document.getElementById("nCanalsSelect").value);
-    const scenario = document.querySelector('input[name="scenario"]:checked').value;
-    const pDepth = parseInt(document.getElementById("pDepthSelect").value);
-    const seed = parseInt(document.getElementById("seedInput").value) || 42;
+    const regionKey = document.getElementById("regionSelect").value;
+    const supplyTmc = parseFloat(document.getElementById("supplyInput").value) || 10.0;
+    const nCanals   = parseInt(document.getElementById("nCanalsSelect").value);
+    const pDepth    = parseInt(document.getElementById("pDepthSelect").value);
+    const seed      = parseInt(document.getElementById("seedInput").value) || 42;
 
-    fetchSchedule(nCanals, scenario, pDepth, seed);
+    fetchSchedule(nCanals, supplyTmc, pDepth, seed, regionKey);
 }
 
-/**
- * Fetch Water Release Schedule from API
- */
-async function fetchSchedule(nCanals, scenario, pDepth, seed) {
+async function fetchSchedule(nCanals, supplyTmc, pDepth, seed, regionKey) {
     showLoading(true);
     try {
         const res = await fetch(`${API_BASE}/schedule`, {
@@ -58,13 +63,14 @@ async function fetchSchedule(nCanals, scenario, pDepth, seed) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 n_canals: nCanals,
-                scenario: scenario,
+                supply_tmc: supplyTmc,
                 p_depth: pDepth,
-                seed: seed
+                seed: seed,
+                region_key: regionKey
             })
         });
 
-        if (!res.ok) throw new Error("Schedule generation failed");
+        if (!res.ok) throw new Error("Optimization failed");
         const json = await res.json();
         
         if (json.success && json.data) {
@@ -72,18 +78,15 @@ async function fetchSchedule(nCanals, scenario, pDepth, seed) {
             renderDashboard(json.data);
         }
     } catch (err) {
-        alert("Failed to generate water release schedule: " + err.message);
+        alert("Optimization request failed: " + err.message);
     } finally {
         showLoading(false);
     }
 }
 
-/**
- * Loading Banner State
- */
 function showLoading(show) {
     const banner = document.getElementById("loadingBanner");
-    const btn = document.getElementById("scheduleBtn");
+    const btn    = document.getElementById("scheduleBtn");
     if (show) {
         banner.classList.remove("hidden");
         btn.disabled = true;
@@ -93,40 +96,34 @@ function showLoading(show) {
     }
 }
 
-/**
- * Render Master Dashboard Data
- */
 function renderDashboard(data) {
-    // 1. Update KPI Summary Header
-    document.getElementById("kpiSupply").textContent = `${data.reservoir_supply_available_tmc} TMC`;
-    document.getElementById("kpiScenarioLabel").textContent = data.scenario;
+    // 1. Summary KPI Cards
+    document.getElementById("kpiSupply").textContent = `${data.available_supply_tmc.toFixed(1)} TMC`;
+    document.getElementById("kpiRegionName").textContent = data.region_name;
 
-    document.getElementById("kpiAllocated").textContent = `${data.total_water_allocated_tmc} TMC`;
-    document.getElementById("kpiEfficiency").textContent = `${data.water_utilization_efficiency_pct}% Efficiency (${data.reservoir_spill_waste_tmc} TMC Waste)`;
+    document.getElementById("kpiAllocated").textContent = `${data.total_allocated_tmc.toFixed(1)} TMC`;
+    document.getElementById("kpiEfficiency").textContent = `${data.water_efficiency_pct.toFixed(1)}% Water Efficiency`;
 
     document.getElementById("kpiEquity").textContent = data.jains_equity_index.toFixed(2);
-    document.getElementById("kpiEquitySub").textContent = data.jains_equity_index >= 0.85 ? "Optimal Equity (Zero Starvation)" : "Sub-Optimal Equity";
+    document.getElementById("kpiEquitySub").textContent = data.equity_status;
 
-    document.getElementById("kpiConflict").textContent = data.conflict_risk_level.split(" ")[0];
-    document.getElementById("kpiViolations").textContent = `${data.min_flow_violations_count} Min-Flow Violations`;
+    document.getElementById("kpiUtility").textContent = data.total_utility_score.toFixed(1);
+    document.getElementById("kpiViolations").textContent = `${data.min_flow_violations} Floor Violations`;
 
-    // 2. Render Official Water Release Schedule Table
+    // 2. Schedule Table
     renderScheduleTable(data.schedule);
 
-    // 3. Render Network Flow Visual Map
+    // 3. Flow Distribution Cards
     renderNetworkFlowGrid(data.schedule);
 
-    // 4. Update Solver Info
-    if (data.solver_info) {
-        const info = data.solver_info;
+    // 4. Optimization Metadata
+    if (data.optimization_meta) {
+        const meta = data.optimization_meta;
         document.getElementById("solverInfoText").textContent = 
-            `Engine: ${info.engine} | Qubits: ${info.n_qubits} | Circuit Depth: p=${info.circuit_depth_p} | Runtime: ${info.runtime_seconds}s | Ising Energy: ${info.energy_score}`;
+            `Engine: ${meta.engine} | Qubits: ${meta.n_qubits} | Depth: p=${meta.circuit_depth_p} | Execution Time: ${meta.runtime_seconds}s | Ising Energy: ${meta.ising_energy}`;
     }
 }
 
-/**
- * Render Release Order Table Rows
- */
 function renderScheduleTable(schedule) {
     const tbody = document.getElementById("scheduleTbody");
     tbody.innerHTML = "";
@@ -134,45 +131,38 @@ function renderScheduleTable(schedule) {
     schedule.forEach(row => {
         const tr = document.createElement("tr");
 
-        const minBadge = row.min_flow_met 
-            ? `<span class="badge-tag badge-success">✅ Met (${row.min_flow_required_tmc} TMC)</span>`
-            : `<span class="badge-tag badge-danger">❌ Violated</span>`;
+        const statusBadge = row.min_flow_met 
+            ? `<span class="badge-tag badge-success">Passed (${row.min_flow_req_tmc} TMC)</span>`
+            : `<span class="badge-tag badge-danger">Violated</span>`;
 
         tr.innerHTML = `
-            <td><strong>${row.canal_name}</strong></td>
-            <td><span class="badge-tag badge-cwc">${row.zone}</span></td>
+            <td><strong>Zone ${row.canal_id}</strong></td>
+            <td>${row.canal_name}</td>
+            <td>${row.reach_zone}</td>
             <td>${row.target_use}</td>
-            <td><strong>${row.assigned_level}</strong></td>
-            <td><strong>${row.allocated_units_tmc} TMC</strong></td>
-            <td>${row.flow_rate_cusecs.toLocaleString()} cusecs</td>
+            <td><strong>${row.release_level}</strong></td>
+            <td><strong>${row.allocated_tmc} TMC</strong></td>
+            <td>${row.flow_cusecs.toLocaleString()} cusecs</td>
             <td>${row.gate_opening_pct}%</td>
-            <td>${minBadge}</td>
-            <td>+${row.benefit_score}</td>
+            <td>${statusBadge}</td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-/**
- * Render Canal Flow Visual Map
- */
 function renderNetworkFlowGrid(schedule) {
     const grid = document.getElementById("networkFlowGrid");
     grid.innerHTML = "";
 
     schedule.forEach(row => {
         const card = document.createElement("div");
-        const zoneClass = row.zone.toLowerCase().includes("head") ? "zone-head" : (row.zone.toLowerCase().includes("middle") ? "zone-middle" : "zone-tail");
-        card.className = `flow-card ${zoneClass}`;
-
-        const isMun = row.stakeholder === "municipal";
-        const icon = isMun ? "🏙️" : "🌾";
+        card.className = "flow-card";
 
         card.innerHTML = `
-            <div class="flow-title">${icon} ${row.canal_name.split("(")[0]}</div>
-            <div class="flow-units">${row.allocated_units_tmc} TMC</div>
+            <div class="flow-title">${row.canal_name.split("(")[0]}</div>
+            <div class="flow-units">${row.allocated_tmc} TMC</div>
             <div class="flow-meta">
-                <span>Rate: ${row.flow_rate_cusecs.toLocaleString()} cusecs</span>
+                <span>Flow: ${row.flow_cusecs.toLocaleString()} cusecs</span>
                 <span>Gate: ${row.gate_opening_pct}% Open</span>
             </div>
         `;
@@ -180,9 +170,6 @@ function renderNetworkFlowGrid(schedule) {
     });
 }
 
-/**
- * CSV Release Order Exporter for CWC/KGBO Officials
- */
 function exportScheduleCSV() {
     if (!currentScheduleData || !currentScheduleData.schedule) {
         alert("No schedule data available to export.");
@@ -190,21 +177,20 @@ function exportScheduleCSV() {
     }
 
     const rows = [
-        ["Canal Name", "Zone", "Stakeholder", "Target Use", "Assigned Level", "Allocated TMC", "Flow Rate (Cusecs)", "Gate Opening %", "Min Flow Met", "Utility Score"]
+        ["Zone ID", "Canal Reach Name", "Position", "Target Use", "Release Level", "Allocated TMC", "Flow Rate (Cusecs)", "Gate Opening %", "Min Flow Status"]
     ];
 
-    currentScheduleData.schedule.forEach(item => {
+    currentScheduleData.schedule.forEach(r => {
         rows.push([
-            `"${item.canal_name}"`,
-            `"${item.zone}"`,
-            `"${item.stakeholder}"`,
-            `"${item.target_use}"`,
-            `"${item.assigned_level}"`,
-            item.allocated_units_tmc,
-            item.flow_rate_cusecs,
-            item.gate_opening_pct,
-            item.min_flow_met ? "Yes" : "No",
-            item.benefit_score
+            r.canal_id,
+            `"${r.canal_name}"`,
+            `"${r.reach_zone}"`,
+            `"${r.target_use}"`,
+            `"${r.release_level}"`,
+            r.allocated_tmc,
+            r.flow_cusecs,
+            r.gate_opening_pct,
+            r.min_flow_met ? "Passed" : "Violated"
         ]);
     });
 
@@ -212,7 +198,7 @@ function exportScheduleCSV() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `CWC_Water_Release_Order_${currentScheduleData.scenario}.csv`);
+    link.setAttribute("download", `AquaQubit_Release_Schedule_${currentScheduleData.region_name.replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
