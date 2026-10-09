@@ -6,21 +6,31 @@ API base: http://localhost:5000/api/
 import sys, os, time, traceback
 sys.path.insert(0, os.path.dirname(__file__))   # ensure local imports work
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from data import make_instance, SCENARIOS
 from solvers import run_all_solvers
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
-app = Flask(__name__, static_folder=frontend_dir, static_url_path="")
+app = Flask(__name__)
 CORS(app)   # allow the frontend (any origin) to call the API
 
 
 # ── GET / — Serve Frontend ───────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return app.send_static_file("index.html")
+    return send_from_directory(frontend_dir, "index.html")
+
+
+@app.route("/style.css")
+def serve_css():
+    return send_from_directory(frontend_dir, "style.css")
+
+
+@app.route("/app.js")
+def serve_js():
+    return send_from_directory(frontend_dir, "app.js")
 
 
 # ── GET /api/health ───────────────────────────────────────────────────────────
@@ -143,12 +153,55 @@ def demo():
         return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
 
 
+# ── POST /api/schedule ────────────────────────────────────────────────────────
+@app.route("/api/schedule", methods=["GET", "POST"])
+def schedule():
+    """
+    Generate official CWC / KGBO Water Release Order using Quantum QAOA Engine.
+    Body JSON / Query Params:
+      n_canals: int (3, 4, 5)
+      scenario: str ("Deficit", "Normal", "Surplus")
+      p_depth: int (1, 2, 3)
+      seed: int
+    """
+    try:
+        from solvers import solve_water_release_schedule
+        if request.method == "POST":
+            body = request.get_json(force=True, silent=True) or {}
+        else:
+            body = request.args
+        n_canals = int(body.get("n_canals", 5))
+        scenario = str(body.get("scenario", "Normal"))
+        p_depth  = int(body.get("p_depth", 2))
+        seed     = int(body.get("seed", 42))
+
+        order = solve_water_release_schedule(N=n_canals, scenario_name=scenario, p_depth=p_depth, seed=seed)
+        return jsonify({
+            "success": True,
+            "data": order,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
+
+
+# ── GET /api/reservoirs ───────────────────────────────────────────────────────
+@app.route("/api/reservoirs", methods=["GET", "POST"])
+def reservoirs():
+    """Return status of Krishna-Godavari Basin reservoirs."""
+    from data import RESERVOIRS, INFLOW_SCENARIOS
+    return jsonify({
+        "basin": "Krishna-Godavari Command Area",
+        "reservoirs": RESERVOIRS,
+        "scenarios": INFLOW_SCENARIOS,
+    })
+
+
 if __name__ == "__main__":
-    print("Starting Irrigation QAOA Backend on http://localhost:5000")
+    print("Starting Krishna-Godavari Water Release Decision Support System on http://localhost:5000")
     print("Endpoints:")
-    print("  GET  / (Web Dashboard UI)")
+    print("  GET  / (CWC Command Center UI)")
     print("  GET  /api/health")
-    print("  GET  /api/config")
-    print("  GET  /api/demo")
+    print("  GET  /api/reservoirs")
+    print("  POST /api/schedule")
     print("  POST /api/solve")
     app.run(debug=False, host="0.0.0.0", port=5000)

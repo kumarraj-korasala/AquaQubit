@@ -1,363 +1,219 @@
 /**
- * app.js — Frontend JavaScript for Krishna-Godavari Command Area Water Allocation Web UI
- * Connects to Flask backend API (http://localhost:5000/api/)
+ * app.js — Client-Side Logic for CWC / KGBO Command Area Water Release Decision Support System
  */
 
 const API_BASE = window.location.protocol.startsWith('http')
     ? `${window.location.origin}/api`
     : 'http://localhost:5000/api';
 
-let convergenceChart = null;
+let currentScheduleData = null;
 
-// Initialize dashboard on DOM ready
+// Initialize on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
     checkHealth();
-    updateQubitBadge();
+    // Auto-load default schedule on startup
+    fetchSchedule(5, "Normal", 2, 42);
 });
 
 /**
- * Check backend connectivity status
+ * Check backend connectivity
  */
 async function checkHealth() {
     const statusEl = document.getElementById("apiStatus");
     try {
-        const res = await fetch(`${API_BASE}/health`, { method: "GET" });
+        const res = await fetch(`${API_BASE}/health`);
         if (res.ok) {
-            const data = await res.json();
             statusEl.classList.add("connected");
-            statusEl.classList.remove("error");
-            statusEl.querySelector(".status-text").textContent = "Backend Connected";
+            statusEl.querySelector(".status-text").textContent = "Engine Online";
         } else {
             throw new Error("HTTP " + res.status);
         }
     } catch (err) {
-        statusEl.classList.add("error");
         statusEl.classList.remove("connected");
-        statusEl.querySelector(".status-text").textContent = "Backend Offline (Offline Mode)";
+        statusEl.querySelector(".status-text").textContent = "Offline Mode";
     }
 }
 
 /**
- * Update Qubit Badge & Hardware metrics based on canal selection
+ * Form Submit Handler — POST /api/schedule
  */
-function updateQubitBadge() {
-    const n = parseInt(document.getElementById("nCanalsSelect").value);
-    const nQubits = n * 3;
-    document.getElementById("kpiQubits").textContent = `${nQubits} Qubits`;
-    document.getElementById("kpiCanals").textContent = `${n} Canals (3^${n} = ${Math.pow(3, n)} states)`;
-
-    // Update estimated hardware metrics
-    const hwQubits = document.getElementById("hwQubits");
-    const hwDepth = document.getElementById("hwDepth");
-    const hwCnots = document.getElementById("hwCnots");
-
-    if (hwQubits) hwQubits.textContent = `${nQubits} / 156 (FakeFez)`;
-    if (hwDepth)  hwDepth.textContent  = n === 3 ? "~90 - 120" : (n === 4 ? "~140 - 200" : "~220 - 350");
-    if (hwCnots)  hwCnots.textContent  = n === 3 ? "~60 - 90"  : (n === 4 ? "~100 - 160" : "~180 - 280");
-}
-
-/**
- * Handle form submission — POST /api/solve
- */
-async function handleFormSubmit(e) {
+function handleScheduleSubmit(e) {
     e.preventDefault();
-
     const nCanals = parseInt(document.getElementById("nCanalsSelect").value);
     const scenario = document.querySelector('input[name="scenario"]:checked').value;
-    const pCheckboxes = document.querySelectorAll('input[name="p_list"]:checked');
-    const pList = Array.from(pCheckboxes).map(cb => parseInt(cb.value));
+    const pDepth = parseInt(document.getElementById("pDepthSelect").value);
     const seed = parseInt(document.getElementById("seedInput").value) || 42;
 
-    if (pList.length === 0) {
-        alert("Please select at least one QAOA depth p (e.g., p=1).");
-        return;
-    }
+    fetchSchedule(nCanals, scenario, pDepth, seed);
+}
 
-    const payload = {
-        n_canals: nCanals,
-        scenario: scenario,
-        p_list: pList,
-        seed: seed
-    };
-
-    showLoading(true, "Simulating Quantum QAOA Engine...", `Solving for ${nCanals} canals (${nCanals * 3} qubits), ${scenario} scenario.`);
-
+/**
+ * Fetch Water Release Schedule from API
+ */
+async function fetchSchedule(nCanals, scenario, pDepth, seed) {
+    showLoading(true);
     try {
-        const res = await fetch(`${API_BASE}/solve`, {
+        const res = await fetch(`${API_BASE}/schedule`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                n_canals: nCanals,
+                scenario: scenario,
+                p_depth: pDepth,
+                seed: seed
+            })
         });
 
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.error || "Solver failed");
+        if (!res.ok) throw new Error("Schedule generation failed");
+        const json = await res.json();
+        
+        if (json.success && json.data) {
+            currentScheduleData = json.data;
+            renderDashboard(json.data);
         }
-
-        const data = await res.json();
-        renderDashboard(data);
     } catch (err) {
-        alert("Backend request failed: " + err.message + "\n\nMake sure the backend is running at http://localhost:5000");
+        alert("Failed to generate water release schedule: " + err.message);
     } finally {
         showLoading(false);
     }
 }
 
 /**
- * Quick Demo Trigger (N=4, p=1)
+ * Loading Banner State
  */
-async function runDemo() {
-    showLoading(true, "Running Quick Demo (N=4, p=1)...", "Executing fast 12-qubit evaluation (~5 seconds)");
-    try {
-        const res = await fetch(`${API_BASE}/demo`, { method: "GET" });
-        if (!res.ok) throw new Error("Demo route failed");
-        const data = await res.json();
-        renderDashboard(data);
-    } catch (err) {
-        alert("Demo failed: " + err.message);
-    } finally {
-        showLoading(false);
-    }
-}
-
-/**
- * Loading Banner Toggle
- */
-function showLoading(show, title = "", sub = "") {
+function showLoading(show) {
     const banner = document.getElementById("loadingBanner");
-    const runBtn = document.getElementById("runBtn");
-
+    const btn = document.getElementById("scheduleBtn");
     if (show) {
-        document.getElementById("loadingTitle").textContent = title;
-        document.getElementById("loadingSub").textContent = sub;
         banner.classList.remove("hidden");
-        runBtn.disabled = true;
+        btn.disabled = true;
     } else {
         banner.classList.add("hidden");
-        runBtn.disabled = false;
+        btn.disabled = false;
     }
 }
 
 /**
- * Master Render Function for API Data
+ * Render Master Dashboard Data
  */
 function renderDashboard(data) {
-    const results = data.results;
-    const bf = results.brute_force;
+    // 1. Update KPI Summary Header
+    document.getElementById("kpiSupply").textContent = `${data.reservoir_supply_available_tmc} TMC`;
+    document.getElementById("kpiScenarioLabel").textContent = data.scenario;
 
-    // Update Scenario Badge
-    document.getElementById("scenarioBadge").textContent = `Scenario: ${data.scenario} (${data.supply} Units)`;
+    document.getElementById("kpiAllocated").textContent = `${data.total_water_allocated_tmc} TMC`;
+    document.getElementById("kpiEfficiency").textContent = `${data.water_utilization_efficiency_pct}% Efficiency (${data.reservoir_spill_waste_tmc} TMC Waste)`;
 
-    // 1. KPI Cards
-    if (bf) {
-        document.getElementById("kpiBenefit").textContent = `${bf.benefit.toFixed(1)} Units`;
-        document.getElementById("kpiOptimal").textContent = `Ground Truth (E = ${bf.energy})`;
+    document.getElementById("kpiEquity").textContent = data.jains_equity_index.toFixed(2);
+    document.getElementById("kpiEquitySub").textContent = data.jains_equity_index >= 0.85 ? "Optimal Equity (Zero Starvation)" : "Sub-Optimal Equity";
+
+    document.getElementById("kpiConflict").textContent = data.conflict_risk_level.split(" ")[0];
+    document.getElementById("kpiViolations").textContent = `${data.min_flow_violations_count} Min-Flow Violations`;
+
+    // 2. Render Official Water Release Schedule Table
+    renderScheduleTable(data.schedule);
+
+    // 3. Render Network Flow Visual Map
+    renderNetworkFlowGrid(data.schedule);
+
+    // 4. Update Solver Info
+    if (data.solver_info) {
+        const info = data.solver_info;
+        document.getElementById("solverInfoText").textContent = 
+            `Engine: ${info.engine} | Qubits: ${info.n_qubits} | Circuit Depth: p=${info.circuit_depth_p} | Runtime: ${info.runtime_seconds}s | Ising Energy: ${info.energy_score}`;
     }
-
-    // QAOA p=3 or max p ratio
-    const qaoaKeys = Object.keys(results.qaoa || {}).sort();
-    let maxPKey = qaoaKeys[qaoaKeys.length - 1];
-    if (maxPKey && results.qaoa[maxPKey]) {
-        const maxQaoa = results.qaoa[maxPKey];
-        const ratio = (maxQaoa.approx_ratio * 100).toFixed(1);
-        document.getElementById("kpiRatio").textContent = `${ratio}%`;
-        document.getElementById("kpiFeasibility").textContent = `Feasibility: ${(maxQaoa.feasibility_rate * 100).toFixed(0)}%`;
-    }
-
-    // Optimal allocation metrics for fairness & min flow
-    const optAlloc = (bf && bf.allocation) ? bf.allocation : null;
-    if (optAlloc) {
-        document.getElementById("kpiFairness").textContent = optAlloc.fairness_gap !== null ? optAlloc.fairness_gap.toFixed(2) : "0.00";
-        document.getElementById("kpiMinFlow").textContent = `${optAlloc.min_flow_violations} Violations`;
-    }
-
-    // 2. Algorithm Benchmark Table
-    renderResultsTable(results);
-
-    // 3. Canal Allocation Grid (from Brute Force / Optimal solution)
-    if (optAlloc && optAlloc.canals) {
-        renderCanalGrid(optAlloc.canals);
-    }
-
-    // 4. Convergence Chart
-    renderConvergenceChart(results.qaoa, bf ? bf.benefit : null);
 }
 
 /**
- * Populate Benchmark Table
+ * Render Release Order Table Rows
  */
-function renderResultsTable(results) {
-    const tbody = document.getElementById("resultsTbody");
+function renderScheduleTable(schedule) {
+    const tbody = document.getElementById("scheduleTbody");
     tbody.innerHTML = "";
 
-    const rows = [];
-
-    // Brute Force Row
-    if (results.brute_force) {
-        rows.push({
-            name: "Brute Force (Ground Truth)",
-            data: results.brute_force,
-            isOptimal: true,
-            isQaoa: false
-        });
-    }
-
-    // Greedy Row
-    if (results.greedy) {
-        rows.push({
-            name: "Greedy Heuristic",
-            data: results.greedy,
-            isOptimal: false,
-            isQaoa: false
-        });
-    }
-
-    // Sim Anneal Row
-    if (results.sim_anneal) {
-        rows.push({
-            name: "Simulated Annealing",
-            data: results.sim_anneal,
-            isOptimal: false,
-            isQaoa: false
-        });
-    }
-
-    // QAOA Rows
-    if (results.qaoa) {
-        Object.keys(results.qaoa).forEach(pKey => {
-            rows.push({
-                name: `QAOA (${pKey.toUpperCase()})`,
-                data: results.qaoa[pKey],
-                isOptimal: false,
-                isQaoa: true
-            });
-        });
-    }
-
-    rows.forEach(r => {
-        const d = r.data;
+    schedule.forEach(row => {
         const tr = document.createElement("tr");
-        if (r.isOptimal) tr.classList.add("optimal-row");
-        if (r.isQaoa) tr.classList.add("qaoa-row");
 
-        const feasBadge = d.feasible
-            ? `<span class="badge-tag badge-success">Feasible</span>`
-            : `<span class="badge-tag badge-danger">Infeasible</span>`;
-
-        const minFlowMet = (d.allocation && d.allocation.min_flow_violations === 0)
-            ? `<span class="badge-tag badge-success">Met (0)</span>`
-            : `<span class="badge-tag badge-warning">${d.allocation ? d.allocation.min_flow_violations : 0} Violated</span>`;
+        const minBadge = row.min_flow_met 
+            ? `<span class="badge-tag badge-success">✅ Met (${row.min_flow_required_tmc} TMC)</span>`
+            : `<span class="badge-tag badge-danger">❌ Violated</span>`;
 
         tr.innerHTML = `
-            <td><strong>${r.name}</strong></td>
-            <td>${d.benefit ? d.benefit.toFixed(1) : "—"}</td>
-            <td>${d.energy !== null ? d.energy.toFixed(4) : "—"}</td>
-            <td>${d.opt_gap !== null ? d.opt_gap.toFixed(4) : "0.0000"}</td>
-            <td>${d.approx_ratio !== null ? (d.approx_ratio * 100).toFixed(1) + "%" : "100.0%"}</td>
-            <td>${feasBadge}</td>
-            <td>${d.fairness_gap !== null ? d.fairness_gap.toFixed(2) : "—"}</td>
-            <td>${minFlowMet}</td>
-            <td>${d.runtime_s ? d.runtime_s.toFixed(3) + "s" : "<0.001s"}</td>
+            <td><strong>${row.canal_name}</strong></td>
+            <td><span class="badge-tag badge-cwc">${row.zone}</span></td>
+            <td>${row.target_use}</td>
+            <td><strong>${row.assigned_level}</strong></td>
+            <td><strong>${row.allocated_units_tmc} TMC</strong></td>
+            <td>${row.flow_rate_cusecs.toLocaleString()} cusecs</td>
+            <td>${row.gate_opening_pct}%</td>
+            <td>${minBadge}</td>
+            <td>+${row.benefit_score}</td>
         `;
-
         tbody.appendChild(tr);
     });
 }
 
 /**
- * Render Canal Release Schedule Grid
+ * Render Canal Flow Visual Map
  */
-function renderCanalGrid(canals) {
-    const grid = document.getElementById("canalScheduleGrid");
+function renderNetworkFlowGrid(schedule) {
+    const grid = document.getElementById("networkFlowGrid");
     grid.innerHTML = "";
 
-    canals.forEach(c => {
+    schedule.forEach(row => {
         const card = document.createElement("div");
-        card.className = `canal-card type-${c.stakeholder}`;
+        const zoneClass = row.zone.toLowerCase().includes("head") ? "zone-head" : (row.zone.toLowerCase().includes("middle") ? "zone-middle" : "zone-tail");
+        card.className = `flow-card ${zoneClass}`;
 
-        const isMun = c.stakeholder === "municipal";
+        const isMun = row.stakeholder === "municipal";
         const icon = isMun ? "🏙️" : "🌾";
 
         card.innerHTML = `
-            <div class="canal-header">
-                <span>Canal #${c.id} (${c.position})</span>
-                <span>${icon}</span>
-            </div>
-            <div class="canal-title">${c.canal_type}</div>
-            <div class="canal-level-badge">Release: ${c.level} (${c.units} Units)</div>
-            <div class="canal-meta">
-                <span>Benefit: +${c.benefit}</span>
-                <span>Min Flow Req: ${c.min_flow_required} Unit (${c.min_flow_met ? "✅ Met" : "❌ Violated"})</span>
+            <div class="flow-title">${icon} ${row.canal_name.split("(")[0]}</div>
+            <div class="flow-units">${row.allocated_units_tmc} TMC</div>
+            <div class="flow-meta">
+                <span>Rate: ${row.flow_rate_cusecs.toLocaleString()} cusecs</span>
+                <span>Gate: ${row.gate_opening_pct}% Open</span>
             </div>
         `;
-
         grid.appendChild(card);
     });
 }
 
 /**
- * Render QAOA Depth Convergence Chart using Chart.js
+ * CSV Release Order Exporter for CWC/KGBO Officials
  */
-function renderConvergenceChart(qaoaResults, bfBenefit) {
-    const ctx = document.getElementById("convergenceChart").getContext("2d");
-
-    if (convergenceChart) {
-        convergenceChart.destroy();
-    }
-
-    if (!qaoaResults || Object.keys(qaoaResults).length === 0) {
+function exportScheduleCSV() {
+    if (!currentScheduleData || !currentScheduleData.schedule) {
+        alert("No schedule data available to export.");
         return;
     }
 
-    const labels = [];
-    const ratios = [];
-    const benefits = [];
+    const rows = [
+        ["Canal Name", "Zone", "Stakeholder", "Target Use", "Assigned Level", "Allocated TMC", "Flow Rate (Cusecs)", "Gate Opening %", "Min Flow Met", "Utility Score"]
+    ];
 
-    Object.keys(qaoaResults).forEach(pKey => {
-        labels.push(pKey.toUpperCase());
-        const item = qaoaResults[pKey];
-        ratios.push((item.approx_ratio * 100).toFixed(1));
-        benefits.push(item.benefit);
+    currentScheduleData.schedule.forEach(item => {
+        rows.push([
+            `"${item.canal_name}"`,
+            `"${item.zone}"`,
+            `"${item.stakeholder}"`,
+            `"${item.target_use}"`,
+            `"${item.assigned_level}"`,
+            item.allocated_units_tmc,
+            item.flow_rate_cusecs,
+            item.gate_opening_pct,
+            item.min_flow_met ? "Yes" : "No",
+            item.benefit_score
+        ]);
     });
 
-    convergenceChart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: "Approx Ratio (%)",
-                    data: ratios,
-                    borderColor: "#a855f7",
-                    backgroundColor: "rgba(168, 85, 247, 0.15)",
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 6,
-                    pointBackgroundColor: "#a855f7"
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    labels: { color: "#cbd5e1", font: { family: "Outfit" } }
-                }
-            },
-            scales: {
-                y: {
-                    min: 50,
-                    max: 105,
-                    grid: { color: "#334155" },
-                    ticks: { color: "#94a3b8" }
-                },
-                x: {
-                    grid: { color: "#334155" },
-                    ticks: { color: "#94a3b8" }
-                }
-            }
-        }
-    });
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `CWC_Water_Release_Order_${currentScheduleData.scenario}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
